@@ -1,0 +1,7 @@
+#!/bin/bash
+
+wget -O /tmp/safety.zip -c "https://s3-ap-southeast-1.amazonaws.com/grab-aiforsea-dataset/safety.zip"
+unzip /tmp/safety.zip -d /tmp
+mkdir -p ./data
+mv /tmp/safety/* ./data/
+
