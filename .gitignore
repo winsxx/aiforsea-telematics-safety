@@ -1,0 +1,12 @@
+.cache*
+.env*
+!.env/.gitkeep
+*.retry
+*.tox*
+*.csv*
+*egg-info*
+*.pyc*
+.idea*
+.run/
+data/
+.ipynb_checkpoints

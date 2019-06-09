@@ -1,0 +1,9 @@
+# machine learning library
+scikit-learn==0.19.1
+
+# data manipulation library
+pandas==0.23.4
+
+# vector operation library
+numpy==1.14.2
+scipy==1.0.0
