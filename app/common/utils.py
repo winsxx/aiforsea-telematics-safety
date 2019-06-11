@@ -1,7 +1,8 @@
 import glob
+import pandas as pd
 
 
-def read_csv_from_folder(path_pattern: str, file_limit: int = None):
+def read_csv_from_folder(path_pattern: str, file_limit: int = None) -> pd.DataFrame:
     """Read csv files from path pattern. Only read file_limit files if it is defined"""
     file_names = glob.glob(path_pattern)
     file_content_list = []

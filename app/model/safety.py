@@ -177,7 +177,6 @@ class SafetyModelByAggregation(SafetyModel):
         train_dataset_prep = SafetyModel._preprocess(data)
         train_agg_data = self._aggregate_data(train_dataset_prep)
         train_agg_data = pd.merge(train_agg_data, train_label, on='bookingID', validate='1:1')
-        train_agg_data = pd.merge(train_agg_data, train_label, on='bookingID', validate='1:1')
 
         self._features = train_agg_data.columns[train_agg_data.columns.str.contains("max|std|ratio")]
 
@@ -211,7 +210,7 @@ class SafetyModelByAggregation(SafetyModel):
         return prediction_df
 
     @staticmethod
-    def _aggregate_data(preprocessed_dataset: pd.DataFrame) -> pd.DataFrames:
+    def _aggregate_data(preprocessed_dataset: pd.DataFrame) -> pd.DataFrame:
         features_max = ['gyro_filtered_magnitude',
                         'acceleration_magnitude',
                         'Speed',
@@ -229,11 +228,11 @@ class SafetyModelByAggregation(SafetyModel):
                         'gyro_z_filtered']
 
         agg_max = preprocessed_dataset.groupby('bookingID')[features_max].max().reset_index()
-        agg_max.columns = ['bookingID'] + (pd.Series(features_max) + '_max').to_list()
+        agg_max.columns = ['bookingID'] + (pd.Series(features_max) + '_max').tolist()
 
         features_std = ['gyro_filtered_magnitude', 'acceleration_gravity_diff_magnitude']
         agg_std = preprocessed_dataset.groupby('bookingID')[features_std].std().reset_index()
-        agg_std.columns = ['bookingID'] + (pd.Series(features_std) + '_std').to_list()
+        agg_std.columns = ['bookingID'] + (pd.Series(features_std) + '_std').tolist()
 
         agg_data = pd.merge(agg_max, agg_std, on='bookingID', validate='1:1')
         agg_data['second_sequence_ratio'] = agg_data['second_max'] / agg_data['sequence_max'].astype(float)

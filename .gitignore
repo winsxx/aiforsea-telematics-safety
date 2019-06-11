@@ -9,4 +9,6 @@
 .idea*
 .run/
 data/
+venv/
+model/
 .ipynb_checkpoints
