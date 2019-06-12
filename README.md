@@ -30,7 +30,7 @@ TLDR, you could use `./setup-2-environment` to setup, but you still need to acti
 1. Setup data in `./data` directory.
 2. Setup environment.
 3. Make sure to put your test data in `./data-test` directory with structure mentioned above.
-4. Run `./model-predict` to predict the test data. Run `./model-predict -h`to know how to specify other directory for output, test data, and saved model.
+4. Run `./model-train --val-ratio 0.2` to predict the test data. Run `./model-predict -h`to know how to specify other directory for output, test data, and saved model.
 5. To evaluate use `./model-evaluate [prediction_csv_file_path] [test_label_csv_file_path]`. Example: `./model-evaluate output/test_prediction.csv data-test-label/sample-labels.csv`
 6. (Optional) If you want to retrain the model, run `./model-train`. Run `./model-train -h` to know how to specify different sample size, validation ratio, and model file path. 
 
