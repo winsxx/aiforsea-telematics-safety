@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 
 from app.common.utils import read_csv_from_folder
-from app.model.safety import SafetyModelByAggregation
+from app.model.safety import SafetyModelByAggregation, SafetyModelBuilder
 
 
 def combine_safety_pred_label(prediction_df, label_df):
@@ -85,11 +85,24 @@ if __name__ == "__main__":
 
     elif command == 'test':
         parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-predict')
-        parser.add_argument("-d", "--data-path", help='Data directory path contains features sub-directory. '
-                                                      'Default: "./data-test"')
-        parser.add_argument("-m", "--model-path", type=int, help='Directory to load the model. Default: "./model"')
+        parser.add_argument("-d", "--data-dir", help='Data directory path contains features sub-directory.',
+                            default='./data-test')
+        parser.add_argument("-m", "--model-file", help='Directory to load the model.',
+                            default='./model/safety_model_0.mdl')
+        parser.add_argument("-o", "--output-file", help="Prediction output file name.",
+                            default='./output/test_prediction.csv')
         args = parser.parse_args(arg)
-        print(args.data_path)
+
+        print('Loading model from {} ...'.format(args.model_file))
+        model = SafetyModelBuilder().from_persistence(args.model_file)
+        print('Got model with type: {}'.format(model.get_model_type()))
+        print('Loading test data from {} ...'.format('{}/features/*.csv'.format(args.data_dir)))
+        test_features = read_csv_from_folder('{}/features/*.csv'.format(args.data_dir))
+
+        print('Predicting test data with {} rows ...'.format(test_features.shape[0]))
+        prediction_df = model.predict(test_features)
+        prediction_df.to_csv(args.output_file, index=False)
+        print('Done')
     else:
         print('Command is not supported. Available commands: train, test')
 

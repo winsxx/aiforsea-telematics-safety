@@ -159,9 +159,25 @@ class SafetyModel:
 
 
 class SafetyModelBuilder:
-    def from_persistence(self, path: str) -> SafetyModel:
 
-        pass
+    def __init__(self):
+        self._model_dict = {
+            SafetyModelByAggregation.MODEL_TYPE: SafetyModelByAggregation
+        }
+
+    def from_persistence(self, path: str) -> SafetyModel:
+        obj = joblib.load(path)
+        persistence_model_type = obj['model_type']
+        if persistence_model_type is None:
+            raise ValueError('Loaded model is not valid, does not have model_type attribute')
+
+        if persistence_model_type not in self._model_dict.keys():
+            raise NotImplementedError('Model with type {} is not registered'.format(persistence_model_type))
+
+        safety_model_class = self._model_dict[persistence_model_type]
+        safety_model = safety_model_class()
+        safety_model.load(path)
+        return safety_model
 
 
 class SafetyModelByAggregation(SafetyModel):
