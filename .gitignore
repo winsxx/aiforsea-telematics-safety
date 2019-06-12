@@ -3,12 +3,9 @@
 !.env/.gitkeep
 *.retry
 *.tox*
-*.csv*
 *egg-info*
 *.pyc*
 .idea*
 .run/
-data/
 venv/
-model/
 .ipynb_checkpoints

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.externals import joblib
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score
 
 
 class SafetyModel:
@@ -156,6 +157,17 @@ class SafetyModel:
         dataset = SafetyModel._accel_data_enrich(dataset, smoothing=5)
         dataset = SafetyModel._diff_data_enrich(dataset)
         return dataset
+
+
+def combine_safety_pred_label(prediction_df, label_df):
+    """Combine two DataFrame, each DataFrame should contains 'bookingID' column."""
+    return pd.merge(prediction_df, label_df, how='left', on='bookingID', validate='1:1')
+
+
+def evaluate_safety(prediction_df, label_df):
+    """Return AUC evaluation given prediction and label DataFrame. Both should have 'bookingID' column."""
+    pred_label_df = combine_safety_pred_label(prediction_df, label_df)
+    return roc_auc_score(pred_label_df.label, pred_label_df.prediction)
 
 
 class SafetyModelBuilder:

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if hash conda 2>/dev/null; then
+    echo "Using conda environment"
+    conda create -n venv python=3.6
+    source activate venv
+    pip install -r requirements.txt
+    printf "\n\n\nNow, activate the environment using 'source activate venv'\n\n"
+elif hash virtualenv 2>/dev/null; then
+    echo "Using virtualenv environment"
+    virtualenv -p python3 venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    printf "\n\n\nNow, activate the environment using 'source venv/bin/activate'\n\n"
+else
+    echo "Both conda and virualenv are not available. Please install one of them."
+fi

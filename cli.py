@@ -2,21 +2,8 @@ import sys
 import argparse
 import pandas as pd
 
-from sklearn.metrics import roc_auc_score
-
 from app.common.utils import read_csv_from_folder
-from app.model.safety import SafetyModelByAggregation, SafetyModelBuilder
-
-
-def combine_safety_pred_label(prediction_df, label_df):
-    """Combine two DataFrame, each DataFrame should contains 'bookingID' column."""
-    return pd.merge(prediction_df, label_df, how='left', on='bookingID', validate='1:1')
-
-
-def evaluate_safety(prediction_df, label_df):
-    """Return AUC evaluation given prediction and label DataFrame. Both should have 'bookingID' column."""
-    pred_label_df = combine_safety_pred_label(prediction_df, label_df)
-    return roc_auc_score(pred_label_df.label, pred_label_df.prediction)
+from app.model.safety import SafetyModelByAggregation, SafetyModelBuilder, evaluate_safety
 
 
 def train_and_validate(data_path: str, model_file_path: str, sample_size: str = None, val_ratio: float = None):
@@ -71,13 +58,14 @@ if __name__ == "__main__":
     if command == 'train':
         parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-train')
         parser.add_argument("-d", "--data-dir",
-                            help='Train directory path contains features and labels sub-directory.',
+                            help='Train directory path contains features and labels sub-directory. Default: "./data"',
                             default='./data')
         parser.add_argument("-v", "--val-ratio", type=float,
                             help="Proportion of train data used as validation. Doesn't validate model if not specified.")
         parser.add_argument("-s", "--sample-size", type=int,
                             help="Number of sample used in training the model. Use all data if not specified.")
-        parser.add_argument("-m", "--model-file", help='Directory to save the model.',
+        parser.add_argument("-m", "--model-file",
+                            help='Directory to save the model. Default: "./model/safety_model_0.mdl"',
                             default='./model/safety_model_0.mdl')
         args = parser.parse_args(arg)
 
@@ -85,11 +73,14 @@ if __name__ == "__main__":
 
     elif command == 'test':
         parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-predict')
-        parser.add_argument("-d", "--data-dir", help='Data directory path contains features sub-directory.',
+        parser.add_argument("-d", "--data-dir",
+                            help='Data directory path contains features sub-directory. Default: "./data-test"',
                             default='./data-test')
-        parser.add_argument("-m", "--model-file", help='Directory to load the model.',
+        parser.add_argument("-m", "--model-file",
+                            help='Directory to load the model. Default: "./model/safety_model_0.mdl"',
                             default='./model/safety_model_0.mdl')
-        parser.add_argument("-o", "--output-file", help="Prediction output file name.",
+        parser.add_argument("-o", "--output-file",
+                            help='Prediction output file name. Default: "./output/test_prediction.csv"',
                             default='./output/test_prediction.csv')
         args = parser.parse_args(arg)
 
@@ -103,6 +94,21 @@ if __name__ == "__main__":
         prediction_df = model.predict(test_features)
         prediction_df.to_csv(args.output_file, index=False)
         print('Done')
+    elif command == 'evaluate':
+        parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-evaluate')
+        parser.add_argument("prediction_file_path", help='Path to prediction csv-file')
+        parser.add_argument("test_label_file_path", help='Path to test label csv-file')
+        args = parser.parse_args(arg)
+
+        print('Load prediction from {}'.format(args.prediction_file_path))
+        prediction_df = pd.read_csv(args.prediction_file_path)
+        print('Prediction have {} rows.'.format(prediction_df.shape[0]))
+
+        print('Load test label from {}'.format(args.test_label_file_path))
+        test_label = pd.read_csv(args.test_label_file_path)
+        print('Test label have {} rows.'.format(test_label.shape[0]))
+
+        print('Test AUC score: {}'.format(evaluate_safety(prediction_df, test_label)))
     else:
         print('Command is not supported. Available commands: train, test')
 

@@ -1,7 +1,7 @@
 # AI For SEA - Safety
 This project is for ["AI For SEA" Challenge](https://www.aiforsea.com). 
 
-## Setup data
+## Setup Data
 The data files should be structured in this format.
 ```
 ./data
@@ -13,17 +13,25 @@ The data files should be structured in this format.
 ```
 To setup the data provided by Grab, run `./setup-1-dataset`
 
-## Notebook
-1. Open project directory
-2. Setup data in `./data` directory. Run `./setup-1-dataset` for default dataset. 
-3. Create virtual environment with **python 3** either with `virtualenv` or `conda`
-    * `virtualenv -p pyton3 venv`, then `source venv/bin/activate`
+## Setup Environment
+TLDR, you could use `./setup-2-environment` to setup, but you still need to activate the environment yourself. We need to make an isolated environment and install the requirements.  For manual setup:
+1. Create virtual environment with **python 3** either with `virtualenv` or `conda`
+    * `virtualenv -p python3 venv`, then `source venv/bin/activate`
     * or, `conda create -n venv python=3.6`, then `source activate venv`
-4. Run `pip install -r requirements.txt`
+2. Run `pip install -r requirements.txt`
+
+## Notebook
+1. Setup data in `./data` directory.
+2. Setup environment.
 5. Open notebook with **Jupyter Notebook**, **Jupyter Lab**, or other tools that support `.ipynb`
-6. Re-run all the cells
+6. Re-run all the cells.
 
-## Train and Evaluate Model
-
+## Train, Predict and Evaluate Model
+1. Setup data in `./data` directory.
+2. Setup environment.
+3. Make sure to put your test data in `./data-test` directory with structure mentioned above.
+4. Run `./model-predict` to predict the test data. Run `./model-predict -h`to know how to specify other directory for output, test data, and saved model.
+5. To evaluate use `./model-evaluate [prediction_csv_file_path] [test_label_csv_file_path]`. Example: `./model-evaluate output/test_prediction.csv data-test-label/sample-labels.csv`
+6. (Optional) If you want to retrain the model, run `./model-train`. Run `./model-train -h` to know how to specify different sample size, validation ratio, and model file path. 
 
 
