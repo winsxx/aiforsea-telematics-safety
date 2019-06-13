@@ -26,7 +26,7 @@ class SafetyModel:
         return self._model_type
 
     @staticmethod
-    def _preprocess_label(labels: pd.DataFrame) -> pd.DataFrame:
+    def preprocess_label(labels: pd.DataFrame) -> pd.DataFrame:
         return labels.groupby(['bookingID']).max().reset_index().copy(deep=False)
 
     @staticmethod
@@ -53,7 +53,7 @@ class SafetyModel:
                 continue
             agg_stable = enriched_dataset.groupby('bookingID')[col].mean().reset_index()
             agg_stable.columns = ['bookingID', col + '_stable']
-            enriched_dataset = pd.merge(enriched_dataset, agg_stable, how='left', on='bookingID', validate='m:1')
+            enriched_dataset = pd.merge(enriched_dataset, agg_stable, how='left', on='bookingID', validate='m:1', copy=False)
 
         # Gyroscope filtered / calibrated values
         for col in gyro_cols:
@@ -69,7 +69,7 @@ class SafetyModel:
         # Gyroscope magnitude standard deviation
         agg_std = enriched_dataset.groupby('bookingID')['gyro_filtered_magnitude'].std().reset_index()
         agg_std.columns = ['bookingID', 'gyro_filtered_std']
-        enriched_dataset = pd.merge(enriched_dataset, agg_std, how='left', on='bookingID', validate='m:1')
+        enriched_dataset = pd.merge(enriched_dataset, agg_std, how='left', on='bookingID', validate='m:1', copy=False)
 
         return enriched_dataset
 
@@ -86,7 +86,7 @@ class SafetyModel:
                 accel_cols
             ].rolling(window=smoothing, min_periods=1, center=True).mean())
         rolling_mean_data.columns = accel_cols + '_gravity'
-        enriched_dataset = pd.concat([enriched_dataset, rolling_mean_data], axis=1, verify_integrity=True)
+        enriched_dataset = pd.concat([enriched_dataset, rolling_mean_data], axis=1, verify_integrity=True, copy=False)
 
         # Acceleration magnitude
         enriched_dataset['acceleration_magnitude'] = np.sqrt(enriched_dataset['acceleration_x'] ** 2 + \
@@ -105,20 +105,20 @@ class SafetyModel:
         agg_std = enriched_dataset.groupby('bookingID')[
             'acceleration_magnitude', 'acceleration_gravity_diff_magnitude'].std().reset_index()
         agg_std.columns = ['bookingID', 'acceleration_std', 'acceleration_gravity_diff_std']
-        enriched_dataset = pd.merge(enriched_dataset, agg_std, how='left', on='bookingID', validate='m:1')
+        enriched_dataset = pd.merge(enriched_dataset, agg_std, how='left', on='bookingID', validate='m:1', copy=False)
 
         # Phone orientation
-        enriched_dataset['orientation_theta'] = np.arctan(enriched_dataset.acceleration_x_gravity /
-                                                          np.sqrt(enriched_dataset.acceleration_y_gravity ** 2 +
-                                                                  enriched_dataset.acceleration_z_gravity ** 2)
-                                                          ) / np.pi * 360
-        enriched_dataset['orientation_psi'] = np.arctan(enriched_dataset.acceleration_y_gravity /
-                                                        np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 +
-                                                                enriched_dataset.acceleration_z_gravity ** 2)
-                                                        ) / np.pi * 360
-        enriched_dataset['orientation_phi'] = np.arctan(
-            np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 + enriched_dataset.acceleration_y_gravity ** 2) /
-            enriched_dataset.acceleration_z_gravity) / np.pi * 360
+        # enriched_dataset['orientation_theta'] = np.arctan(enriched_dataset.acceleration_x_gravity /
+        #                                                   np.sqrt(enriched_dataset.acceleration_y_gravity ** 2 +
+        #                                                           enriched_dataset.acceleration_z_gravity ** 2)
+        #                                                   ) / np.pi * 360
+        # enriched_dataset['orientation_psi'] = np.arctan(enriched_dataset.acceleration_y_gravity /
+        #                                                 np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 +
+        #                                                         enriched_dataset.acceleration_z_gravity ** 2)
+        #                                                 ) / np.pi * 360
+        # enriched_dataset['orientation_phi'] = np.arctan(
+        #     np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 + enriched_dataset.acceleration_y_gravity ** 2) /
+        #     enriched_dataset.acceleration_z_gravity) / np.pi * 360
 
         return enriched_dataset
 
@@ -142,7 +142,7 @@ class SafetyModel:
 
         # Combine
         diff_data = diff_data.fillna(0)
-        enriched_dataset = pd.concat([enriched_dataset, diff_data], axis=1, verify_integrity=True)
+        enriched_dataset = pd.concat([enriched_dataset, diff_data], axis=1, verify_integrity=True, copy=False)
 
         # Combine accuracy of two sequence
         acc_sum = enriched_dataset.groupby('bookingID')['Accuracy'] \
@@ -153,20 +153,25 @@ class SafetyModel:
 
     @staticmethod
     def _preprocess(dataset: pd.DataFrame) -> pd.DataFrame:
+        print('Preprocess - Gyro ...')
         dataset = SafetyModel._gyro_data_enrich(dataset)
+        print('Preprocess - Accelerometer ...')
         dataset = SafetyModel._accel_data_enrich(dataset, smoothing=5)
+        print('Preprocess - Diff ...')
         dataset = SafetyModel._diff_data_enrich(dataset)
         return dataset
 
 
 def combine_safety_pred_label(prediction_df, label_df):
     """Combine two DataFrame, each DataFrame should contains 'bookingID' column."""
-    return pd.merge(prediction_df, label_df, how='left', on='bookingID', validate='1:1')
+    return pd.merge(prediction_df, label_df, how='left', on='bookingID', validate='1:1', copy=False)
 
 
 def evaluate_safety(prediction_df, label_df):
     """Return AUC evaluation given prediction and label DataFrame. Both should have 'bookingID' column."""
-    pred_label_df = combine_safety_pred_label(prediction_df, label_df)
+    pred_label_df = combine_safety_pred_label(
+        SafetyModel.preprocess_label(prediction_df),
+        SafetyModel.preprocess_label(label_df))
     return roc_auc_score(pred_label_df.label, pred_label_df.prediction)
 
 
@@ -201,13 +206,14 @@ class SafetyModelByAggregation(SafetyModel):
         self._model = None
 
     def build(self, data: pd.DataFrame, label: pd.DataFrame) -> None:
-        train_label = self._preprocess_label(label)
+        print('Preprocess data ...')
+        train_label = self.preprocess_label(label)
         train_dataset_prep = SafetyModel._preprocess(data)
+        print('Aggregate data ...')
         train_agg_data = self._aggregate_data(train_dataset_prep)
-        train_agg_data = pd.merge(train_agg_data, train_label, on='bookingID', validate='1:1')
-
+        train_agg_data = pd.merge(train_agg_data, train_label, on='bookingID', validate='1:1', copy=False)
+        print('Building RandomForestClassifier model ...')
         self._features = train_agg_data.columns[train_agg_data.columns.str.contains("max|std|ratio")]
-
         self._model = RandomForestClassifier(n_estimators=100, random_state=0, min_samples_leaf=75)
         self._model.fit(train_agg_data[self._features], train_agg_data.label)
 
@@ -230,8 +236,11 @@ class SafetyModelByAggregation(SafetyModel):
     def predict(self, data: pd.DataFrame) -> pd.DataFrame:
         if self._model is None:
             raise AttributeError('Model is not available. Build or load the model beforehand.')
+        print('Preprocess data ...')
         test_dataset_prep = self._preprocess(data)
+        print('Aggregate data ...')
         test_agg_data = self._aggregate_data(test_dataset_prep)
+        print('Predicting ...')
         prediction = self._model.predict_proba(test_agg_data[self._features])
         prediction = prediction[:, np.argwhere(self._model.classes_ == 1)[0][0]]
         prediction_df = pd.DataFrame(data={'bookingID': test_agg_data.bookingID, 'prediction': prediction})
@@ -262,6 +271,6 @@ class SafetyModelByAggregation(SafetyModel):
         agg_std = preprocessed_dataset.groupby('bookingID')[features_std].std().reset_index()
         agg_std.columns = ['bookingID'] + (pd.Series(features_std) + '_std').tolist()
 
-        agg_data = pd.merge(agg_max, agg_std, on='bookingID', validate='1:1')
+        agg_data = pd.merge(agg_max, agg_std, on='bookingID', validate='1:1', copy=False)
         agg_data['second_sequence_ratio'] = agg_data['second_max'] / agg_data['sequence_max'].astype(float)
         return agg_data

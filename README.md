@@ -11,7 +11,7 @@ The data files should be structured in this format.
     ./labels
         [filename2].csv
 ```
-To setup the data provided by Grab, run `./setup-1-dataset`
+To setup the data provided by Grab, run `./setup-1-dataset`. You could cancel and re-run if it is stuck. The download will continue.
 
 ## Setup Environment
 TLDR, you could use `./setup-2-environment` to setup, but you still need to activate the environment yourself. We need to make an isolated environment and install the requirements.  For manual setup:
@@ -30,7 +30,7 @@ TLDR, you could use `./setup-2-environment` to setup, but you still need to acti
 1. Setup data in `./data` directory.
 2. Setup environment.
 3. Make sure to put your test data in `./data-test` directory with structure mentioned above.
-4. Run `./model-train --val-ratio 0.2` to predict the test data. Run `./model-predict -h`to know how to specify other directory for output, test data, and saved model.
+4. Run `./model-train --val-ratio 0.3` to predict the test data. Add `-s 1000` parameter to only use 1000 booking. Run `./model-predict -h` to know how to specify other directory for output, test data, and saved model.
 5. To evaluate use `./model-evaluate [prediction_csv_file_path] [test_label_csv_file_path]`. Example: `./model-evaluate output/test_prediction.csv data-test-label/sample-labels.csv`
 6. (Optional) If you want to retrain the model, run `./model-train`. Run `./model-train -h` to know how to specify different sample size, validation ratio, and model file path. 
 
