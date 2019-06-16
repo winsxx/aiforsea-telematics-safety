@@ -3,10 +3,11 @@ import argparse
 import pandas as pd
 
 from app.common.utils import read_csv_from_folder
-from app.model.safety import SafetyModelByAggregation, SafetyModelBuilder, evaluate_safety
+from app.model.safety import SafetyModelByAggregation, SafetyModelBuilder, evaluate_safety, SafetyModelByCnn
 
 
-def train_and_validate(data_path: str, model_file_path: str, sample_size: str = None, val_ratio: float = None):
+def train_and_validate(model_type: str, data_path: str, model_file_path: str, sample_size: str = None,
+                       val_ratio: float = None):
     # Read raw data from directory
     features_raw = read_csv_from_folder('{}/features/*.csv'.format(data_path))
     labels = read_csv_from_folder('{}/labels/*.csv'.format(data_path))
@@ -36,17 +37,23 @@ def train_and_validate(data_path: str, model_file_path: str, sample_size: str = 
         val_label = labels.loc[labels.bookingID.isin(validation_booking_ids), :].copy(deep=False)
 
     # Train and save model
-    model = SafetyModelByAggregation()
+    if model_type == 'rf':
+        clf_model = SafetyModelByAggregation()
+    elif model_type == 'cnn':
+        clf_model = SafetyModelByCnn()
+    else:
+        raise AttributeError('Invalid model type {}'.format(model_type))
+
     print('Start to build model with {} bookings ...'.format(len(train_dataset.bookingID.unique())))
-    model.build(train_dataset, train_label)
+    clf_model.build(train_dataset, train_label)
     print('Saving model to {}'.format(model_file_path))
-    model.save(model_file_path)
+    clf_model.save(model_file_path)
 
     # Validation
     if val_ratio is not None:
         print('Validation to {} bookings'.format(len(val_dataset.bookingID.unique())))
-        prediction_df = model.predict(val_dataset)
-        print('Validation AUC score: {}'.format(evaluate_safety(prediction_df, val_label)))
+        clf_prediction_df = clf_model.predict(val_dataset)
+        print('Validation AUC score: {}'.format(evaluate_safety(clf_prediction_df, val_label)))
 
     print('Done')
 
@@ -57,6 +64,8 @@ if __name__ == "__main__":
 
     if command == 'train':
         parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-train')
+        parser.add_argument("model-type", help='Model type, either "rf", "cnn", or "cnn-rf-stack"',
+                            choices=["rf", "cnn", "cnn-rf-stack"])
         parser.add_argument("-d", "--data-dir",
                             help='Train directory path contains features and labels sub-directory. Default: "./data"',
                             default='./data')
@@ -94,6 +103,7 @@ if __name__ == "__main__":
         prediction_df = model.predict(test_features)
         prediction_df.to_csv(args.output_file, index=False)
         print('Done')
+
     elif command == 'evaluate':
         parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-evaluate')
         parser.add_argument("prediction_file_path", help='Path to prediction csv-file')

@@ -1,5 +1,9 @@
 import numpy as np
 import pandas as pd
+from keras import Input, Model, Sequential
+from keras.callbacks import EarlyStopping
+from keras.layers import Conv1D, GlobalMaxPooling1D, AveragePooling1D, Concatenate, Dropout, Dense
+from keras_preprocessing.sequence import pad_sequences
 from sklearn.externals import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
@@ -10,7 +14,7 @@ class SafetyModel:
     def __init__(self, model_type: str):
         self._model_type = model_type
 
-    def build(self, data: pd.DataFrame, label: pd.DataFrame) -> None:
+    def build(self, data: pd.DataFrame, label: pd.DataFrame):
         pass
 
     def save(self, path: str):
@@ -53,7 +57,8 @@ class SafetyModel:
                 continue
             agg_stable = enriched_dataset.groupby('bookingID')[col].mean().reset_index()
             agg_stable.columns = ['bookingID', col + '_stable']
-            enriched_dataset = pd.merge(enriched_dataset, agg_stable, how='left', on='bookingID', validate='m:1', copy=False)
+            enriched_dataset = pd.merge(enriched_dataset, agg_stable, how='left', on='bookingID', validate='m:1',
+                                        copy=False)
 
         # Gyroscope filtered / calibrated values
         for col in gyro_cols:
@@ -108,17 +113,17 @@ class SafetyModel:
         enriched_dataset = pd.merge(enriched_dataset, agg_std, how='left', on='bookingID', validate='m:1', copy=False)
 
         # Phone orientation
-        # enriched_dataset['orientation_theta'] = np.arctan(enriched_dataset.acceleration_x_gravity /
-        #                                                   np.sqrt(enriched_dataset.acceleration_y_gravity ** 2 +
-        #                                                           enriched_dataset.acceleration_z_gravity ** 2)
-        #                                                   ) / np.pi * 360
-        # enriched_dataset['orientation_psi'] = np.arctan(enriched_dataset.acceleration_y_gravity /
-        #                                                 np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 +
-        #                                                         enriched_dataset.acceleration_z_gravity ** 2)
-        #                                                 ) / np.pi * 360
-        # enriched_dataset['orientation_phi'] = np.arctan(
-        #     np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 + enriched_dataset.acceleration_y_gravity ** 2) /
-        #     enriched_dataset.acceleration_z_gravity) / np.pi * 360
+        enriched_dataset['orientation_theta'] = np.arctan(enriched_dataset.acceleration_x_gravity /
+                                                          np.sqrt(enriched_dataset.acceleration_y_gravity ** 2 +
+                                                                  enriched_dataset.acceleration_z_gravity ** 2)
+                                                          ) / np.pi * 360
+        enriched_dataset['orientation_psi'] = np.arctan(enriched_dataset.acceleration_y_gravity /
+                                                        np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 +
+                                                                enriched_dataset.acceleration_z_gravity ** 2)
+                                                        ) / np.pi * 360
+        enriched_dataset['orientation_phi'] = np.arctan(
+            np.sqrt(enriched_dataset.acceleration_x_gravity ** 2 + enriched_dataset.acceleration_y_gravity ** 2) /
+            enriched_dataset.acceleration_z_gravity) / np.pi * 360
 
         return enriched_dataset
 
@@ -179,7 +184,8 @@ class SafetyModelBuilder:
 
     def __init__(self):
         self._model_dict = {
-            SafetyModelByAggregation.MODEL_TYPE: SafetyModelByAggregation
+            SafetyModelByAggregation.MODEL_TYPE: SafetyModelByAggregation,
+            SafetyModelByCnn.MODEL_TYPE: SafetyModelByCnn
         }
 
     def from_persistence(self, path: str) -> SafetyModel:
@@ -197,6 +203,134 @@ class SafetyModelBuilder:
         return safety_model
 
 
+class SafetyModelByCnn(SafetyModel):
+    MODEL_TYPE = 'safety-cnn-v0'
+    CNN_FEATURES = ['acceleration_x', 'acceleration_y', 'acceleration_z', 'acceleration_gravity_diff_magnitude',
+                    'Bearing', 'gyro_x_filtered', 'gyro_y_filtered', 'gyro_z_filtered', 'gyro_filtered_magnitude',
+                    'Speed', 'Accuracy', 'second', 'second_diff', 'orientation_theta', 'orientation_psi',
+                    'orientation_phi']
+    SEQUENCE_MAX_LEN = 200
+
+    def __init__(self):
+        super(SafetyModelByCnn, self).__init__(self.MODEL_TYPE)
+        self._model = None
+
+    def build(self, data: pd.DataFrame, label: pd.DataFrame):
+        print('Preprocess data ...')
+        train_label = self.preprocess_label(label)
+        train_dataset_prep = SafetyModel._preprocess(data)
+
+        print('Preprocess data - To CNN input format ...')
+        train_dataset_cnn, train_booking_ids = self._to_cnn_dataset(train_dataset_prep)
+
+        self._model = self._create_model_cnn(train_dataset_cnn)
+        self._model.compile(loss='binary_crossentropy',
+                            optimizer='adam', metrics=['binary_accuracy'])
+        train_label_cnn = pd.merge(train_booking_ids, train_label, on='bookingID').label
+
+        callbacks_list = [
+            EarlyStopping(monitor='binary_accuracy', patience=3)
+        ]
+        print('Building CNN model ...')
+        history = self._model.fit(train_dataset_cnn,
+                                  np.array(train_label_cnn).reshape((-1, 1)),
+                                  batch_size=4,
+                                  epochs=50,
+                                  callbacks=callbacks_list,
+                                  validation_split=0.2,
+                                  verbose=1)
+        print('Done learning CNN model.')
+
+    def save(self, path: str):
+        obj = {
+            'model_type': self._model_type,
+            'model': self._model
+        }
+        joblib.dump(obj, path, protocol=2)
+
+    def load(self, path: str):
+        obj = joblib.load(path)
+        if obj['model_type'] != self.MODEL_TYPE:
+            raise ValueError('Incompatible type to load. Expect {} but get {}'
+                             .format(self.MODEL_TYPE, obj['model_type']))
+        self._model = obj['model']
+
+    def predict(self, data: pd.DataFrame) -> pd.DataFrame:
+        if self._model is None:
+            raise AttributeError('Model is not available. Build or load the model beforehand.')
+        print('Preprocess data ...')
+        test_dataset_prep = SafetyModel._preprocess(data)
+
+        print('Preprocess data - To CNN input format ...')
+        test_dataset_cnn, test_booking_ids = self._to_cnn_dataset(test_dataset_prep)
+
+        print('Predicting ...')
+        prediction = self._model.predict_proba(test_dataset_cnn)
+        prediction_df = pd.DataFrame(data={'bookingID': test_booking_ids.bookingID, 'prediction': prediction[:, 0]})
+        return prediction_df
+
+    def _to_cnn_dataset(self, preprocessed_dataset: pd.DataFrame) -> (list, pd.DataFrame):
+        data_cnn = preprocessed_dataset.copy()
+
+        data_cnn[['acceleration_x', 'acceleration_y', 'acceleration_z']] = \
+            data_cnn[['acceleration_x', 'acceleration_y', 'acceleration_z']] / 10.0
+        data_cnn[['gyro_x_filtered', 'gyro_y_filtered', 'gyro_z_filtered']] = \
+            data_cnn[['gyro_x_filtered', 'gyro_y_filtered', 'gyro_z_filtered']]
+        data_cnn['Bearing'] = data_cnn['Bearing'] / 360.0
+        data_cnn[['orientation_theta', 'orientation_psi', 'orientation_phi']] = \
+            data_cnn[['orientation_theta', 'orientation_psi', 'orientation_phi']] / 180.0
+        data_cnn['Speed'] = data_cnn['Speed'] / 35.0
+        data_cnn['second'] = data_cnn['second'] / 1750.0
+        data_cnn['second_diff'] = data_cnn['second_diff'] / 30.0
+        data_cnn['Accuracy'] = data_cnn['Accuracy'] / 15.0
+
+        data_cnn, booking_ids = self._to_keras_input(data_cnn, self._CNN_FEATURES, self.SEQUENCE_MAX_LEN)
+        return data_cnn, booking_ids
+
+    @staticmethod
+    def _to_keras_input(dataset: pd.DataFrame, features: list, maxlen: int = 200) -> (list, pd.DataFrame):
+        dataset_seq = dataset[
+            list(set(['bookingID', 'second'] + features))
+        ].groupby('bookingID').apply(
+            lambda x: x.sort_values(by='second')[features].values.tolist()
+        )
+        booking_ids = pd.DataFrame({'idx': range(len(dataset_seq.index)), 'bookingID': dataset_seq.index})
+        dataset_seq = pad_sequences(dataset_seq, maxlen=maxlen, padding='pre', dtype=float, truncating='pre', value=0.0)
+        return dataset_seq, booking_ids
+
+    @staticmethod
+    def _create_model_cnn(dataset):
+        num_seq = len(dataset[0])
+        num_features = len(dataset[0][0])
+
+        inpt = Input(shape=(num_seq, num_features))
+
+        convs = []
+
+        conv1 = Conv1D(8, 1, activation='relu')(inpt)
+        pool1 = GlobalMaxPooling1D()(conv1)
+        convs.append(pool1)
+
+        conv2 = Conv1D(8, 3, activation='relu')(inpt)
+        pool2_1 = AveragePooling1D(pool_size=5)(conv2)
+        conv2_1 = Conv1D(16, 3, activation='relu')(pool2_1)
+        pool2_2 = GlobalMaxPooling1D()(conv2_1)
+        convs.append(pool2_2)
+
+        out = Concatenate()(convs)
+        first_segment_model = Model(inputs=[inpt], outputs=[out])
+
+        model = Sequential()
+        model.add(first_segment_model)
+        model.add(Dropout(0.2))
+        model.add(Dense(16, activation='sigmoid'))
+        model.add(Dense(1, activation='sigmoid'))
+
+        print(first_segment_model.summary())
+        print(model.summary())
+        return model
+
+
 class SafetyModelByAggregation(SafetyModel):
     MODEL_TYPE = 'safety-aggregation_v0'
 
@@ -205,7 +339,7 @@ class SafetyModelByAggregation(SafetyModel):
         self._features = None
         self._model = None
 
-    def build(self, data: pd.DataFrame, label: pd.DataFrame) -> None:
+    def build(self, data: pd.DataFrame, label: pd.DataFrame):
         print('Preprocess data ...')
         train_label = self.preprocess_label(label)
         train_dataset_prep = SafetyModel._preprocess(data)
