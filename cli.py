@@ -3,7 +3,8 @@ import argparse
 import pandas as pd
 
 from app.common.utils import read_csv_from_folder
-from app.model.safety import SafetyModelByAggregation, SafetyModelBuilder, evaluate_safety, SafetyModelByCnn
+from app.model.safety import SafetyModelByAggregation, SafetyModelBuilder, evaluate_safety, SafetyModelByCnn, \
+    SafetyModelByCnnRandomForestStack
 
 
 def train_and_validate(model_type: str, data_path: str, model_file_path: str, sample_size: str = None,
@@ -41,6 +42,8 @@ def train_and_validate(model_type: str, data_path: str, model_file_path: str, sa
         clf_model = SafetyModelByAggregation()
     elif model_type == 'cnn':
         clf_model = SafetyModelByCnn()
+    elif model_type == 'cnn-rf-stack':
+        clf_model = SafetyModelByCnnRandomForestStack()
     else:
         raise AttributeError('Invalid model type {}'.format(model_type))
 
