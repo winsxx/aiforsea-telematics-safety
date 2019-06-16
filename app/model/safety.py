@@ -59,6 +59,7 @@ class SafetyModel:
             agg_stable.columns = ['bookingID', col + '_stable']
             enriched_dataset = pd.merge(enriched_dataset, agg_stable, how='left', on='bookingID', validate='m:1',
                                         copy=False)
+            del agg_stable
 
         # Gyroscope filtered / calibrated values
         for col in gyro_cols:
@@ -75,6 +76,7 @@ class SafetyModel:
         agg_std = enriched_dataset.groupby('bookingID')['gyro_filtered_magnitude'].std().reset_index()
         agg_std.columns = ['bookingID', 'gyro_filtered_std']
         enriched_dataset = pd.merge(enriched_dataset, agg_std, how='left', on='bookingID', validate='m:1', copy=False)
+        del agg_std
 
         return enriched_dataset
 
@@ -92,6 +94,7 @@ class SafetyModel:
             ].rolling(window=smoothing, min_periods=1, center=True).mean())
         rolling_mean_data.columns = accel_cols + '_gravity'
         enriched_dataset = pd.concat([enriched_dataset, rolling_mean_data], axis=1, verify_integrity=True, copy=False)
+        del rolling_mean_data
 
         # Acceleration magnitude
         enriched_dataset['acceleration_magnitude'] = np.sqrt(enriched_dataset['acceleration_x'] ** 2 +
@@ -111,6 +114,7 @@ class SafetyModel:
             'acceleration_magnitude', 'acceleration_gravity_diff_magnitude'].std().reset_index()
         agg_std.columns = ['bookingID', 'acceleration_std', 'acceleration_gravity_diff_std']
         enriched_dataset = pd.merge(enriched_dataset, agg_std, how='left', on='bookingID', validate='m:1', copy=False)
+        del agg_std
 
         # Phone orientation
         enriched_dataset['orientation_theta'] = np.arctan(enriched_dataset.acceleration_x_gravity /
@@ -148,11 +152,13 @@ class SafetyModel:
         # Combine
         diff_data = diff_data.fillna(0)
         enriched_dataset = pd.concat([enriched_dataset, diff_data], axis=1, verify_integrity=True, copy=False)
+        del diff_data
 
         # Combine accuracy of two sequence
         acc_sum = enriched_dataset.groupby('bookingID')['Accuracy'] \
             .rolling(window=2, min_periods=1).sum().reset_index(drop=True).tolist()
         enriched_dataset['Accuracy_sum'] = acc_sum
+        del acc_sum
 
         return enriched_dataset
 
@@ -222,6 +228,7 @@ class SafetyModelByCnn(SafetyModel):
 
         print('Preprocess data - To CNN input format ...')
         train_dataset_cnn, train_booking_ids = self._to_cnn_dataset(train_dataset_prep)
+        del train_dataset_prep
 
         self._model = self._create_model_cnn(train_dataset_cnn)
         self._model.compile(loss='binary_crossentropy',
