@@ -67,8 +67,8 @@ class SafetyModel:
             enriched_dataset[col + '_filtered'] = enriched_dataset[col] - enriched_dataset[col + '_stable']
 
         # Gyroscope magnitude of calibrated values
-        enriched_dataset['gyro_filtered_magnitude'] = np.sqrt(enriched_dataset['gyro_x_filtered'] ** 2 + \
-                                                              enriched_dataset['gyro_y_filtered'] ** 2 + \
+        enriched_dataset['gyro_filtered_magnitude'] = np.sqrt(enriched_dataset['gyro_x_filtered'] ** 2 +
+                                                              enriched_dataset['gyro_y_filtered'] ** 2 +
                                                               enriched_dataset['gyro_z_filtered'] ** 2)
 
         # Gyroscope magnitude standard deviation
@@ -94,8 +94,8 @@ class SafetyModel:
         enriched_dataset = pd.concat([enriched_dataset, rolling_mean_data], axis=1, verify_integrity=True, copy=False)
 
         # Acceleration magnitude
-        enriched_dataset['acceleration_magnitude'] = np.sqrt(enriched_dataset['acceleration_x'] ** 2 + \
-                                                             enriched_dataset['acceleration_y'] ** 2 + \
+        enriched_dataset['acceleration_magnitude'] = np.sqrt(enriched_dataset['acceleration_x'] ** 2 +
+                                                             enriched_dataset['acceleration_y'] ** 2 +
                                                              enriched_dataset['acceleration_z'] ** 2)
 
         # Current acceleration vs gravity diff
@@ -284,7 +284,7 @@ class SafetyModelByCnn(SafetyModel):
         data_cnn['second_diff'] = data_cnn['second_diff'] / 30.0
         data_cnn['Accuracy'] = data_cnn['Accuracy'] / 15.0
 
-        data_cnn, booking_ids = self._to_keras_input(data_cnn, self._CNN_FEATURES, self.SEQUENCE_MAX_LEN)
+        data_cnn, booking_ids = self._to_keras_input(data_cnn, self.CNN_FEATURES, self.SEQUENCE_MAX_LEN)
         return data_cnn, booking_ids
 
     @staticmethod

@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     if command == 'train':
         parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-train')
-        parser.add_argument("model-type", help='Model type, either "rf", "cnn", or "cnn-rf-stack"',
+        parser.add_argument("model_type", help='Model type, either "rf", "cnn", or "cnn-rf-stack"',
                             choices=["rf", "cnn", "cnn-rf-stack"])
         parser.add_argument("-d", "--data-dir",
                             help='Train directory path contains features and labels sub-directory. Default: "./data"',
@@ -78,7 +78,7 @@ if __name__ == "__main__":
                             default='./model/safety_model_0.mdl')
         args = parser.parse_args(arg)
 
-        train_and_validate(args.data_dir, args.model_file, args.sample_size, args.val_ratio)
+        train_and_validate(args.model_type, args.data_dir, args.model_file, args.sample_size, args.val_ratio)
 
     elif command == 'test':
         parser = argparse.ArgumentParser(description="Safety prediction model.", prog='model-predict')
