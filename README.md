@@ -21,9 +21,12 @@ TLDR, you could use `./setup-2-environment` to setup, but you still need to acti
 2. Run `pip install -r requirements.txt`
 
 ## Notebook
+Open view the notebook without re-running the script, open `2019-06-09+Telematics+Safety+Analysis.html` file in project root.
+
+To re-run the notebook:
 1. Setup data in `./data` directory.
 2. Setup environment.
-5. Open notebook with **Jupyter Notebook**, **Jupyter Lab**, or other tools that support `.ipynb`
+5. Open notebook with `jupyter notebook`, or other tools that support `.ipynb`
 6. Re-run all the cells.
 
 ## Train, Predict and Evaluate Model
